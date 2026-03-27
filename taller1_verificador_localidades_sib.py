@@ -64,10 +64,31 @@ COLUMNAS_MUNICIPIO = ["county", "municipio"]
 # ── Palabras/siglas que NO deben marcarse como siglas ─────────────
 # Palabras en mayúsculas que son válidas o nombres geográficos conocidos
 PALABRAS_MAYUSCULAS_VALIDAS = {
+    # Palabras técnicas y estados válidos
     "SIN", "DATOS", "NaN", "NA", "N/A",
-    # Departamentos en mayúsculas (si alguien los escribió así)
+    # País
     "COLOMBIA",
+    # Instituciones colombianas cuyo nombre oficial es una sigla
+    # (agregar aquí las siglas válidas de tu colección)
+    "CES",       # Universidad CES — válida en bases de datos CBUCES
+    "IAVH",      # Instituto Humboldt
+    "IDEAM",     # Instituto de Hidrología
+    "IGAC",      # Instituto Geográfico Agustín Codazzi
+    "SINCHI",    # Instituto Amazónico
+    "INDERENA",  # Instituto histórico de recursos naturales
+    "UNAL",      # Universidad Nacional de Colombia
+    "UDEA",      # Universidad de Antioquia
+    "UIS",       # Universidad Industrial de Santander
+    "UPTC",      # Universidad Pedagógica y Tecnológica de Colombia
 }
+
+# NOTA PARA OTRAS COLECCIONES:
+# Si usas este código en una colección diferente a CBUCES,
+# revisa esta lista y agrega o quita las siglas institucionales
+# que sean válidas en tu contexto. Por ejemplo, si tu colección
+# pertenece a la Universidad del Valle, agrega "UNIVALLE".
+# Las siglas de ÁREAS PROTEGIDAS nunca son válidas (PNN, SFF, etc.)
+# independientemente de la colección.
 
 # ── Siglas de áreas protegidas (para mensaje específico) ──────────
 SIGLAS_AREAS_PROTEGIDAS = {
