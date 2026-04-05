@@ -61,41 +61,26 @@ COLUMNAS_PAIS = ["country", "país", "pais"]
 COLUMNAS_DEPTO = ["stateprovince", "departamento", "stateProvince"]
 COLUMNAS_MUNICIPIO = ["county", "municipio"]
 
-# ── Palabras/siglas que NO deben marcarse como siglas ─────────────
-# Palabras en mayúsculas que son válidas o nombres geográficos conocidos
+# ── Palabras/siglas que NO deben marcarse como error ──────────────
 PALABRAS_MAYUSCULAS_VALIDAS = {
-    # Palabras técnicas y estados válidos
     "SIN", "DATOS", "NaN", "NA", "N/A",
-    # País
     "COLOMBIA",
-    # Instituciones colombianas cuyo nombre oficial es una sigla
-    # (agregar aquí las siglas válidas de tu colección)
-    "CES",       # Universidad CES — válida en bases de datos CBUCES
-    "IAVH",      # Instituto Humboldt
-    "IDEAM",     # Instituto de Hidrología
-    "IGAC",      # Instituto Geográfico Agustín Codazzi
-    "SINCHI",    # Instituto Amazónico
-    "INDERENA",  # Instituto histórico de recursos naturales
-    "UNAL",      # Universidad Nacional de Colombia
-    "UDEA",      # Universidad de Antioquia
-    "UIS",       # Universidad Industrial de Santander
-    "UPTC",      # Universidad Pedagógica y Tecnológica de Colombia
+    "CES", "IAVH", "IDEAM", "IGAC", "SINCHI",
+    "INDERENA", "UNAL", "UDEA", "UIS", "UPTC",
 }
 
 # NOTA PARA OTRAS COLECCIONES:
 # Si usas este código en una colección diferente a CBUCES,
 # revisa esta lista y agrega o quita las siglas institucionales
-# que sean válidas en tu contexto. Por ejemplo, si tu colección
-# pertenece a la Universidad del Valle, agrega "UNIVALLE".
-# Las siglas de ÁREAS PROTEGIDAS nunca son válidas (PNN, SFF, etc.)
-# independientemente de la colección.
+# válidas en tu contexto. Las siglas de ÁREAS PROTEGIDAS nunca
+# son válidas (PNN, SFF, etc.) independientemente de la colección.
 
-# ── Siglas de áreas protegidas (para mensaje específico) ──────────
+# ── Siglas de áreas protegidas ────────────────────────────────────
 SIGLAS_AREAS_PROTEGIDAS = {
     "PNN", "SFF", "RNA", "DMI", "DRMI", "VPP", "ANU", "RNSC", "ZRC",
 }
 
-# ── Palabras con tilde frecuentemente omitidas ───────────────────
+# ── Tildes frecuentemente omitidas ───────────────────────────────
 PALABRAS_CON_TILDE = {
     "paramo": "Páramo", "paramos": "Páramos",
     "area": "Área", "areas": "Áreas",
@@ -126,13 +111,8 @@ def normalizar(texto):
 
 
 def detectar_siglas_generales(loc):
-    """
-    Detecta cualquier palabra escrita completamente en mayúsculas
-    de 2 o más letras que no sea una excepción conocida.
-    Cubre siglas como: CVZ, RR, CBZS, URR, PNN, SFF, etc.
-    """
+    """Detecta palabras en mayúsculas que podrían ser siglas no permitidas."""
     errores = []
-    # Buscar palabras de 2+ letras todas mayúsculas (incluyendo tildes en mayúsculas)
     patron = r'\b[A-ZÁÉÍÓÚÑ]{2,}\b'
     matches = re.findall(patron, loc)
     for m in matches:
@@ -152,18 +132,11 @@ def detectar_siglas_generales(loc):
 
 
 def detectar_abreviaturas_generales(loc):
-    """
-    Detecta abreviaturas: palabras cortas (2-5 letras) seguidas de punto
-    que no sean el final de la cadena ni números.
-    Ej: Vda. Hda. Mpio. Dpto. Carr. Cra. etc.
-    """
+    """Detecta abreviaturas: palabras cortas seguidas de punto."""
     errores = []
-    # Patrón: 2-5 letras seguidas de punto, que no sea fin de texto
     patron = r'\b([A-Za-záéíóúñÁÉÍÓÚÑ]{2,5})\.'
     matches = re.finditer(patron, loc)
     for m in matches:
-        palabra = m.group(1)
-        # Ignorar si es número romano o si la palabra completa está en el texto sin punto
         errores.append(
             f"Posible abreviatura: '{m.group()}' — verificar si debe escribirse completo"
         )
@@ -174,37 +147,43 @@ def detectar_errores(localidad):
     """
     Recibe una cadena de localidad y retorna lista de errores encontrados.
     """
-    if not isinstance(localidad, str) or localidad.strip() == "":
-        return []
+    # ── Regla 4: Campo vacío → documentar como "Sin datos" ────────
+    if not isinstance(localidad, str) or localidad.strip() == "" or normalizar(localidad.strip()) == "nan":
+        return ["Campo localidad vacío — debe documentarse como 'Sin datos' según el protocolo SiB"]
 
     errores = []
     loc = localidad.strip()
 
-    # 1. Minúscula al inicio
+    # ── Regla 1 y 2: Ortografía ───────────────────────────────────
+
+    # Mayúscula al inicio
     if loc[0].islower():
         errores.append("La descripción debe iniciar con mayúscula")
 
-    # 2. Punto final
+    # Punto final
     if loc.endswith('.'):
-        # Evitar falso positivo si termina en sigla con punto (ya cubierta arriba)
-        errores.append("Tiene punto final (no permitido al terminar la localidad)")
+        errores.append("Tiene punto final — no se permite al terminar la localidad")
 
-    # 3. Separadores incorrectos
+    # Separadores incorrectos
     for sep in SEPARADORES_INCORRECTOS:
         if sep in loc:
             errores.append(f"Separador incorrecto '{sep}' — usar solo comas (,)")
             break
 
-    # 4. Siglas en mayúsculas (detección general — incluye áreas protegidas)
-    errores.extend(detectar_siglas_generales(loc))
+    # Comillas innecesarias
+    if '"' in loc or '\u201c' in loc or '\u201d' in loc:
+        errores.append(
+            "Uso de comillas — solo se usan para citas textuales o descripciones ambiguas, "
+            "no para nombres propios"
+        )
 
-    # 5. Abreviaturas con punto (detección general)
-    # Solo si no termina en punto (ya detectado) para no duplicar
-    loc_sin_fin = loc.rstrip('.')
-    abrev = detectar_abreviaturas_generales(loc_sin_fin)
-    errores.extend(abrev)
+    # Conector 'y' entre descripciones
+    if re.search(r',\s+y\s+', loc):
+        errores.append(
+            "Posible conector 'y' — verificar si debe reemplazarse por coma"
+        )
 
-    # 6. Tildes faltantes
+    # Tildes faltantes
     loc_norm = normalizar(loc)
     for sin_tilde, con_tilde in PALABRAS_CON_TILDE.items():
         if re.search(r'\b' + sin_tilde + r'\b', loc_norm):
@@ -214,27 +193,25 @@ def detectar_errores(localidad):
                     f"→ debería ser '{con_tilde}'"
                 )
 
-    # 7. Comillas innecesarias
-    if '"' in loc or '\u201c' in loc or '\u201d' in loc:
-        errores.append(
-            "Uso de comillas — solo se usan para citas textuales o descripciones ambiguas"
-        )
+    # ── Regla 5: Siglas en áreas protegidas ──────────────────────
+    # (también detecta cualquier otra sigla institucional)
+    errores.extend(detectar_siglas_generales(loc))
 
-    # 8. Conector 'y' entre descripciones (debe ser coma)
-    if re.search(r',\s+y\s+', loc):
-        errores.append(
-            "Posible conector 'y' — verificar si debe reemplazarse por coma"
-        )
+    # ── Regla 6: Abreviaturas ─────────────────────────────────────
+    loc_sin_fin = loc.rstrip('.')
+    errores.extend(detectar_abreviaturas_generales(loc_sin_fin))
 
-    # 9. Información de hábitat dentro de localidad
-    palabras_habitat = ['bosque', 'pastizal', 'rastrojo', 'potrero', 'cultivo',
-                        'páramo', 'subpáramo', 'humedal', 'manglar']
-    loc_norm2 = normalizar(loc)
+    # ── Regla 3: Info que no hace parte de la localidad ──────────
+    # Detecta hábitat dentro del campo localidad
+    palabras_habitat = [
+        'bosque', 'pastizal', 'rastrojo', 'potrero', 'cultivo',
+        'páramo', 'subpáramo', 'humedal', 'manglar'
+    ]
     for hab in palabras_habitat:
-        if re.search(r'\b' + normalizar(hab) + r'\b', loc_norm2):
+        if re.search(r'\b' + normalizar(hab) + r'\b', loc_norm):
             errores.append(
                 f"Posible información de hábitat ('{hab}') dentro del campo localidad — "
-                f"no hace parte del campo localidad según el protocolo SiB"
+                f"verificar si debe trasladarse al campo correspondiente (habitat)"
             )
             break
 
@@ -242,21 +219,12 @@ def detectar_errores(localidad):
 
 
 def limpiar_nombre_col(nombre):
-    """
-    Normaliza un nombre de columna para comparación:
-    quita asteriscos (*), espacios extra y pasa a minúsculas.
-    Necesario porque el estándar Darwin Core marca columnas obligatorias con *
-    (ej: '*verbatimLocality' o 'verbatimLocality *').
-    """
+    """Normaliza nombre de columna: quita asteriscos y espacios, pasa a minúsculas."""
     return nombre.replace('*', '').strip().lower()
 
 
 def encontrar_columna(df, opciones):
-    """
-    Busca una columna en el DataFrame por varias variantes de nombre.
-    Ignora asteriscos (*) y espacios extra en los nombres de columnas
-    (formato común en plantillas Darwin Core del SiB Colombia).
-    """
+    """Busca una columna en el DataFrame por varias variantes de nombre."""
     cols_limpias = {limpiar_nombre_col(c): c for c in df.columns}
     for opcion in opciones:
         if opcion.lower() in cols_limpias:
@@ -273,14 +241,14 @@ def generar_reporte(df, col_localidad, col_pais=None, col_depto=None, col_munici
         localidad = fila.get(col_localidad, "") if col_localidad else ""
         errores = detectar_errores(str(localidad) if pd.notna(localidad) else "")
 
-        if col_pais and pd.isna(fila.get(col_pais)):
-            if isinstance(localidad, str) and localidad.strip():
+        # Campos geográficos vacíos con localidad diligenciada
+        localidad_str = str(localidad) if pd.notna(localidad) else ""
+        if localidad_str.strip() and normalizar(localidad_str.strip()) != "nan":
+            if col_pais and (pd.isna(fila.get(col_pais)) or str(fila.get(col_pais)).strip() == ""):
                 errores.append("Campo País vacío con localidad diligenciada")
-        if col_depto and pd.isna(fila.get(col_depto)):
-            if isinstance(localidad, str) and localidad.strip():
+            if col_depto and (pd.isna(fila.get(col_depto)) or str(fila.get(col_depto)).strip() == ""):
                 errores.append("Campo Departamento vacío con localidad diligenciada")
-        if col_municipio and pd.isna(fila.get(col_municipio)):
-            if isinstance(localidad, str) and localidad.strip():
+            if col_municipio and (pd.isna(fila.get(col_municipio)) or str(fila.get(col_municipio)).strip() == ""):
                 errores.append("Campo Municipio vacío con localidad diligenciada")
 
         errores_por_fila.append(errores)
@@ -309,7 +277,7 @@ def generar_reporte(df, col_localidad, col_pais=None, col_depto=None, col_munici
         }).sort_values("Registros afectados", ascending=False)
         df_resumen.to_excel(writer, sheet_name='Resumen de errores', index=False)
 
-        # Formato hoja 1
+        # ── Formato hoja 1 ─────────────────────────────────────────
         ws = writer.sheets['Registros con errores']
         amarillo = PatternFill("solid", fgColor="FFF3CD")
         verde_claro = PatternFill("solid", fgColor="D4EDDA")
@@ -339,7 +307,7 @@ def generar_reporte(df, col_localidad, col_pais=None, col_depto=None, col_munici
         ws.row_dimensions[1].height = 30
         ws.freeze_panes = "A2"
 
-        # Formato hoja resumen
+        # ── Formato hoja resumen ───────────────────────────────────
         ws2 = writer.sheets['Resumen de errores']
         for cell in ws2[1]:
             cell.fill = header_fill
@@ -433,7 +401,7 @@ if archivo is not None:
 4. Corrige en <b>OpenRefine</b>: doble clic → Editar → nombre correcto.<br>
 5. Exporta el CSV corregido.<br><br>
 ⚠️ <b>Recuerda:</b> esta herramienta detecta errores de formato y sintaxis.
-Los nombres geográficos mal escritos pero sin errores de formato
+Los nombres geográficos incorrectos pero sin errores de formato
 requieren revisión manual y criterio curatorial.
 </div>
 """, unsafe_allow_html=True)
@@ -444,3 +412,4 @@ requieren revisión manual y criterio curatorial.
 
 st.markdown("---")
 st.caption("Colecciones Biológicas · Universidad CES · Protocolo SiB Colombia / Instituto Humboldt")
+
