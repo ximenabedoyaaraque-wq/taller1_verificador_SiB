@@ -21,12 +21,14 @@ st.set_page_config(
 
 st.markdown("""
 <style>
-    .titulo { font-size: 1.6rem; font-weight: 700; color: #1F6B40; }
-    .subtitulo { font-size: 1rem; color: #555; margin-bottom: 1.5rem; }
-    .instruccion { background: #E8F5EE; padding: 1rem; border-radius: 8px;
-                   border-left: 4px solid #1F6B40; margin-bottom: 1rem; }
-    .advertencia { background: #FFF9E6; padding: 1rem; border-radius: 8px;
-                   border-left: 4px solid #E8A020; margin-bottom: 1rem; }
+    .titulo { font-size: 1.6rem; font-weight: 700; color: #2ECC71; }
+    .subtitulo { font-size: 1rem; color: inherit; opacity: 0.7; margin-bottom: 1.5rem; }
+    .instruccion { background: rgba(30, 130, 76, 0.15); padding: 1rem; border-radius: 8px;
+                   border-left: 4px solid #2ECC71; margin-bottom: 1rem; color: inherit; }
+    .advertencia { background: rgba(230, 160, 30, 0.15); padding: 1rem; border-radius: 8px;
+                   border-left: 4px solid #E8A020; margin-bottom: 1rem; color: inherit; }
+    .resultado { background: rgba(128,128,128,0.1); padding: 1rem; border-radius: 8px;
+                 margin-top: 1rem; color: inherit; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -331,7 +333,16 @@ archivo = st.file_uploader(
 if archivo is not None:
     try:
         if archivo.name.endswith('.csv'):
-            df = pd.read_csv(archivo, encoding='utf-8-sig', low_memory=False)
+            muestra = archivo.read(4096).decode('utf-8-sig', errors='replace')
+            archivo.seek(0)
+            sep = ';' if muestra.count(';') > muestra.count(',') else ','
+            df = pd.read_csv(archivo, encoding='utf-8-sig', sep=sep, low_memory=False)
+            if len(df.columns) == 1:
+                archivo.seek(0)
+                sep = ',' if sep == ';' else ';'
+                df = pd.read_csv(archivo, encoding='utf-8-sig', sep=sep, low_memory=False)
+            separador_nombre = "punto y coma (;)" if sep == ';' else "coma (,)"
+            st.caption(f"CSV detectado con separador: {separador_nombre}")
         else:
             df = pd.read_excel(archivo)
 
@@ -412,4 +423,3 @@ requieren revisión manual y criterio curatorial.
 
 st.markdown("---")
 st.caption("Colecciones Biológicas · Universidad CES · Protocolo SiB Colombia / Instituto Humboldt")
-
